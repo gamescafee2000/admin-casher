@@ -13,6 +13,15 @@ const path = require('path');
 
 const app = express();
 app.use(express.json());
+// يسمح لتطبيق الكاشير (اللي يشتغل على دومين مختلف تماماً، مثل GitHub Pages) يتواصل مع هذا السيرفر.
+// بدون هذا، المتصفح يحجب أي طلب بين دومينين مختلفين تلقائياً (CORS) ويطلع خطأ "تعذر الاتصال".
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, x-admin-secret');
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
+    next();
+});
 app.use('/admin', express.static(path.join(__dirname, 'public')));
 // يخلي /admin و /admin/ يفتحون صفحة الإدارة مباشرة بدون الحاجة تكتب admin.html بآخر الرابط
 app.get(['/admin', '/admin/'], (req, res) => {
