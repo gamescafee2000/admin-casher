@@ -116,13 +116,16 @@ app.post('/api/admin/check', requireAdmin, (req, res) => {
 // ADMIN (password-protected): used from the /admin page to manage keys.
 // ------------------------------------------------------------------
 app.post('/api/admin/licenses', requireAdmin, (req, res) => {
-  const { customerName, months } = req.body || {};
-  if (!customerName || !months) {
-    return res.status(400).json({ error: 'customerName and months are required' });
+  const { customerName, months, days } = req.body || {};
+  if (!customerName || (!months && !days)) {
+    return res.status(400).json({ error: 'customerName and months or days are required' });
   }
   const key = generateKey();
   const now = Date.now();
-  const expiresAt = now + Math.round(Number(months) * 30 * 24 * 60 * 60 * 1000);
+  const durationMs = days
+    ? Math.round(Number(days) * 24 * 60 * 60 * 1000)
+    : Math.round(Number(months) * 30 * 24 * 60 * 60 * 1000);
+  const expiresAt = now + durationMs;
   db.prepare(`INSERT INTO licenses (key, customer_name, expires_at, active, created_at) VALUES (?, ?, ?, 1, ?)`)
     .run(key, customerName, expiresAt, now);
   res.json({ key, customerName, expiresAt });
@@ -133,11 +136,14 @@ app.get('/api/admin/licenses', requireAdmin, (req, res) => {
 });
 
 app.post('/api/admin/licenses/:key/renew', requireAdmin, (req, res) => {
-  const { months } = req.body || {};
+  const { months, days } = req.body || {};
   const license = db.prepare('SELECT * FROM licenses WHERE key = ?').get(req.params.key);
   if (!license) return res.status(404).json({ error: 'not_found' });
   const base = Math.max(license.expires_at, Date.now());
-  const newExpiry = base + Math.round(Number(months) * 30 * 24 * 60 * 60 * 1000);
+  const durationMs = days
+    ? Math.round(Number(days) * 24 * 60 * 60 * 1000)
+    : Math.round(Number(months) * 30 * 24 * 60 * 60 * 1000);
+  const newExpiry = base + durationMs;
   db.prepare('UPDATE licenses SET expires_at = ?, active = 1 WHERE key = ?').run(newExpiry, license.key);
   res.json({ key: license.key, expiresAt: newExpiry });
 });
