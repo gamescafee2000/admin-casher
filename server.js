@@ -14,6 +14,10 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 app.use('/admin', express.static(path.join(__dirname, 'public')));
+// يخلي /admin و /admin/ يفتحون صفحة الإدارة مباشرة بدون الحاجة تكتب admin.html بآخر الرابط
+app.get(['/admin', '/admin/'], (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
 
 const PORT = process.env.PORT || 3000;
 // IMPORTANT: set this to a real secret via environment variable in production.
