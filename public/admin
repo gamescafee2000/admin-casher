@@ -1,1 +1,129 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>إدارة اشتراكات كيمز كوفي</title>
+<style>
+  body { font-family: -apple-system, Arial, sans-serif; background:#1a1a1a; color:#fff; padding:16px; max-width: 720px; margin: 0 auto; }
+  h2 { color:#f39c12; }
+  input, button { padding:10px; margin:4px 0; border-radius:6px; border:1px solid #404040; background:#2d2d2d; color:#fff; font-size:0.9rem; box-sizing: border-box; }
+  input { width: 100%; }
+  button { background:#f39c12; color:#000; font-weight:bold; cursor:pointer; border:none; }
+  button.danger { background:#e74c3c; color:#fff; }
+  button.secondary { background:#333; color:#fff; }
+  table { width:100%; border-collapse: collapse; margin-top:12px; font-size:0.8rem; }
+  th, td { border:1px solid #404040; padding:6px; text-align:center; word-break: break-all; }
+  .expired { color:#e74c3c; font-weight:bold; }
+  .active { color:#2ecc71; font-weight:bold; }
+  .card { background:#2d2d2d; padding:14px; border-radius:8px; margin-bottom:16px; }
+  .actions button { width: auto; margin: 2px; font-size: 0.75rem; padding: 6px 8px; }
+</style>
+</head>
+<body>
+  <h2>🎟️ إدارة اشتراكات كيمز كوفي</h2>
+
+  <div class="card">
+    <label>كلمة سر الإدارة (ADMIN_SECRET):</label>
+    <input type="password" id="admin-secret" placeholder="اكتب كلمة السر هنا">
+    <button onclick="saveSecret()">حفظ الكلمة</button>
+  </div>
+
+  <div class="card">
+    <h3>➕ إنشاء اشتراك جديد</h3>
+    <input type="text" id="customer-name" placeholder="اسم الزبون / اسم المحل">
+    <input type="number" id="months" placeholder="عدد الأشهر" value="12">
+    <button onclick="createLicense()">توليد مفتاح</button>
+    <p id="new-key-result"></p>
+  </div>
+
+  <div class="card">
+    <h3>📋 كل الاشتراكات</h3>
+    <button class="secondary" onclick="loadLicenses()">🔄 تحديث القائمة</button>
+    <table id="licenses-table">
+      <thead><tr><th>المفتاح</th><th>الزبون</th><th>ينتهي</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+<script>
+function getSecret() { return localStorage.getItem('kims_admin_secret') || ''; }
+function saveSecret() {
+  localStorage.setItem('kims_admin_secret', document.getElementById('admin-secret').value.trim());
+  alert('تم الحفظ. اضغط تحديث القائمة.');
+  loadLicenses();
+}
+document.getElementById('admin-secret').value = getSecret();
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', 'x-admin-secret': getSecret(), ...(options.headers || {}) }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+async function createLicense() {
+  const customerName = document.getElementById('customer-name').value.trim();
+  const months = document.getElementById('months').value;
+  if (!customerName) return alert('اكتب اسم الزبون');
+  try {
+    const data = await api('/api/admin/licenses', { method: 'POST', body: JSON.stringify({ customerName, months }) });
+    document.getElementById('new-key-result').innerHTML =
+      `✅ المفتاح: <b style="color:#f39c12">${data.key}</b> — ينتهي: ${new Date(data.expiresAt).toLocaleDateString('ar-EG')}<br>انسخه وأرسله للزبون.`;
+    loadLicenses();
+  } catch (e) { alert('خطأ: ' + e.message); }
+}
+
+async function loadLicenses() {
+  try {
+    const rows = await api('/api/admin/licenses');
+    const tbody = document.querySelector('#licenses-table tbody');
+    tbody.innerHTML = rows.map(r => {
+      const expired = Date.now() > r.expires_at;
+      const status = !r.active ? '❌ ملغي' : expired ? '<span class="expired">منتهي</span>' : '<span class="active">فعال</span>';
+      return `<tr>
+        <td>${r.key}</td>
+        <td>${r.customer_name}</td>
+        <td>${new Date(r.expires_at).toLocaleDateString('ar-EG')}</td>
+        <td>${status}</td>
+        <td class="actions">
+          <button onclick="renew('${r.key}')">تجديد</button>
+          <button class="danger" onclick="revoke('${r.key}')">إلغاء</button>
+          <button class="secondary" onclick="unbind('${r.key}')">فك ربط الجهاز</button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch (e) { alert('خطأ: ' + e.message); }
+}
+
+async function renew(key) {
+  const months = prompt('كم شهر تريد تضيف؟', '12');
+  if (!months) return;
+  try {
+    await api(`/api/admin/licenses/${key}/renew`, { method: 'POST', body: JSON.stringify({ months }) });
+    loadLicenses();
+  } catch (e) { alert('خطأ: ' + e.message); }
+}
+async function revoke(key) {
+  if (!confirm('متأكد تريد تلغي هذا الاشتراك؟')) return;
+  try {
+    await api(`/api/admin/licenses/${key}/revoke`, { method: 'POST' });
+    loadLicenses();
+  } catch (e) { alert('خطأ: ' + e.message); }
+}
+async function unbind(key) {
+  try {
+    await api(`/api/admin/licenses/${key}/unbind`, { method: 'POST' });
+    loadLicenses();
+    alert('تم فك ربط الجهاز — أول جهاز يفتح البرنامج بهذا المفتاح رح يرتبط بيه من جديد.');
+  } catch (e) { alert('خطأ: ' + e.message); }
+}
+
+loadLicenses();
+</script>
+</body>
+</html>
 
