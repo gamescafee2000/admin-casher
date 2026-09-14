@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "better-sqlite3": "^11.3.0"
+    "@libsql/client": "^0.14.0"
   }
 }
