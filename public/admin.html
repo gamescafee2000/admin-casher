@@ -18,42 +18,72 @@
   .active { color:#2ecc71; font-weight:bold; }
   .card { background:#2d2d2d; padding:14px; border-radius:8px; margin-bottom:16px; }
   .actions button { width: auto; margin: 2px; font-size: 0.75rem; padding: 6px 8px; }
+  #lock-screen { max-width: 340px; margin: 60px auto; text-align: center; }
+  #lock-screen p { font-size: 0.78rem; color: #ccc; }
+  #lock-error { color: #e74c3c; font-size: 0.78rem; min-height: 1em; }
+  .top-bar { display: flex; justify-content: space-between; align-items: center; }
+  .logout-link { color: #e74c3c; font-size: 0.75rem; cursor: pointer; text-decoration: underline; background: none; border: none; padding: 0; }
 </style>
 </head>
 <body>
-  <h2>🎟️ إدارة اشتراكات كيمز كوفي</h2>
 
-  <div class="card">
-    <label>كلمة سر الإدارة (ADMIN_SECRET):</label>
-    <input type="password" id="admin-secret" placeholder="اكتب كلمة السر هنا">
-    <button onclick="saveSecret()">حفظ الكلمة</button>
+  <!-- شاشة القفل: ما يظهر أي شي من محتوى الإدارة إلا بعد كلمة سر صحيحة -->
+  <div id="lock-screen" class="card">
+    <h2>🔒 دخول الإدارة</h2>
+    <p>هاي الصفحة خاصة فيك بس. اكتب كلمة سر الإدارة للدخول.</p>
+    <input type="password" id="admin-secret-input" placeholder="كلمة سر الإدارة" onkeydown="if(event.key==='Enter') attemptLogin()">
+    <button style="width:100%;" onclick="attemptLogin()">دخول</button>
+    <p id="lock-error"></p>
   </div>
 
-  <div class="card">
-    <h3>➕ إنشاء اشتراك جديد</h3>
-    <input type="text" id="customer-name" placeholder="اسم الزبون / اسم المحل">
-    <input type="number" id="months" placeholder="عدد الأشهر" value="12">
-    <button onclick="createLicense()">توليد مفتاح</button>
-    <p id="new-key-result"></p>
-  </div>
+  <!-- محتوى الإدارة الكامل - مخفي بالكامل لين تنجح كلمة السر -->
+  <div id="admin-content" style="display:none;">
+    <div class="top-bar">
+      <h2>🎟️ إدارة اشتراكات كيمز كوفي</h2>
+      <button class="logout-link" onclick="logout()">🔒 خروج</button>
+    </div>
 
-  <div class="card">
-    <h3>📋 كل الاشتراكات</h3>
-    <button class="secondary" onclick="loadLicenses()">🔄 تحديث القائمة</button>
-    <table id="licenses-table">
-      <thead><tr><th>المفتاح</th><th>الزبون</th><th>ينتهي</th><th>الحالة</th><th>إجراءات</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <div class="card">
+      <h3>➕ إنشاء اشتراك جديد</h3>
+      <input type="text" id="customer-name" placeholder="اسم الزبون / اسم المحل">
+      <label style="font-size:0.75rem;">المدة:</label>
+      <select id="duration-unit" onchange="onDurationUnitChange()">
+        <option value="months">أشهر</option>
+        <option value="days">أيام</option>
+      </select>
+      <input type="number" id="duration-value" placeholder="عدد الأشهر" value="12">
+      <button onclick="createLicense()">توليد مفتاح</button>
+      <button class="secondary" style="width:100%; margin-top:6px;" onclick="quickTrialDay()">🧪 توليد مفتاح تجربة (يوم واحد) للزبون</button>
+      <p id="new-key-result"></p>
+    </div>
+
+    <div class="card">
+      <h3>📞 معلومات التواصل</h3>
+      <p style="font-size: 0.7rem; color: #ccc; margin-top:0;">هاي المعلومات تظهر تلقائياً بتطبيق الكاشير عند كل الزبائن، حتى يگدرون يتواصلون وياك بسهولة (مثلاً لما يحتاجون تفعيل أو تجديد اشتراك).</p>
+      <label style="font-size:0.75rem;">رقم واتساب (بالصيغة الدولية، بدون + أو مسافات، مثال: 9647801234567)</label>
+      <input type="text" id="contact-whatsapp" placeholder="9647801234567">
+      <label style="font-size:0.75rem;">رابط انستغرام (اختياري)</label>
+      <input type="text" id="contact-instagram" placeholder="https://instagram.com/your_page">
+      <label style="font-size:0.75rem;">رابط إضافي (اختياري - فيسبوك، تلغرام، موقعك..)</label>
+      <input type="text" id="contact-website" placeholder="https://...">
+      <button onclick="saveContactInfo()">حفظ معلومات التواصل</button>
+      <p id="contact-save-result"></p>
+    </div>
+
+    <div class="card">
+      <h3>📋 كل الاشتراكات</h3>
+      <button class="secondary" onclick="loadLicenses()">🔄 تحديث القائمة</button>
+      <table id="licenses-table">
+        <thead><tr><th>المفتاح</th><th>الزبون</th><th>ينتهي</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
 <script>
 function getSecret() { return localStorage.getItem('kims_admin_secret') || ''; }
-function saveSecret() {
-  localStorage.setItem('kims_admin_secret', document.getElementById('admin-secret').value.trim());
-  alert('تم الحفظ. اضغط تحديث القائمة.');
-  loadLicenses();
-}
-document.getElementById('admin-secret').value = getSecret();
+function setSecret(val) { localStorage.setItem('kims_admin_secret', val); }
+function clearSecret() { localStorage.removeItem('kims_admin_secret'); }
 
 async function api(path, options = {}) {
   const res = await fetch(path, {
@@ -65,16 +95,110 @@ async function api(path, options = {}) {
   return data;
 }
 
+function showAdminContent() {
+  document.getElementById('lock-screen').style.display = 'none';
+  document.getElementById('admin-content').style.display = 'block';
+  loadLicenses();
+  loadContactInfo();
+}
+
+function logout() {
+  clearSecret();
+  document.getElementById('admin-content').style.display = 'none';
+  document.getElementById('lock-screen').style.display = 'block';
+  document.getElementById('admin-secret-input').value = '';
+}
+
+async function attemptLogin() {
+  const val = document.getElementById('admin-secret-input').value.trim();
+  const errEl = document.getElementById('lock-error');
+  if (!val) { errEl.textContent = 'اكتب كلمة السر.'; return; }
+  setSecret(val);
+  errEl.textContent = 'جاري التحقق...';
+  try {
+    await api('/api/admin/check', { method: 'POST' });
+    errEl.textContent = '';
+    showAdminContent();
+  } catch (e) {
+    clearSecret();
+    errEl.textContent = 'كلمة السر غير صحيحة.';
+  }
+}
+
+// عند فتح الصفحة: إذا عندنا كلمة سر محفوظة من قبل، نجرب نتحقق منها تلقائياً بدون ما نطلبها من جديد
+(async function initOnLoad() {
+  if (getSecret()) {
+    try {
+      await api('/api/admin/check', { method: 'POST' });
+      showAdminContent();
+    } catch (e) {
+      clearSecret();
+    }
+  }
+})();
+
+function onDurationUnitChange() {
+  const unit = document.getElementById('duration-unit').value;
+  const input = document.getElementById('duration-value');
+  if (unit === 'days') {
+    input.placeholder = 'عدد الأيام';
+    input.value = '1';
+  } else {
+    input.placeholder = 'عدد الأشهر';
+    input.value = '12';
+  }
+}
+
 async function createLicense() {
   const customerName = document.getElementById('customer-name').value.trim();
-  const months = document.getElementById('months').value;
+  const unit = document.getElementById('duration-unit').value;
+  const value = document.getElementById('duration-value').value;
   if (!customerName) return alert('اكتب اسم الزبون');
+  const body = { customerName };
+  if (unit === 'days') body.days = value; else body.months = value;
   try {
-    const data = await api('/api/admin/licenses', { method: 'POST', body: JSON.stringify({ customerName, months }) });
+    const data = await api('/api/admin/licenses', { method: 'POST', body: JSON.stringify(body) });
     document.getElementById('new-key-result').innerHTML =
-      `✅ المفتاح: <b style="color:#f39c12">${data.key}</b> — ينتهي: ${new Date(data.expiresAt).toLocaleDateString('ar-EG')}<br>انسخه وأرسله للزبون.`;
+      `✅ المفتاح: <b style="color:#f39c12">${data.key}</b> — ينتهي: ${new Date(data.expiresAt).toLocaleDateString('ar-EG')} ${new Date(data.expiresAt).toLocaleTimeString('ar-EG')}<br>انسخه وأرسله للزبون.`;
     loadLicenses();
   } catch (e) { alert('خطأ: ' + e.message); }
+}
+
+// زر سريع: يولد مفتاح تجربة مدته يوم واحد بضغطة وحدة، بدون الحاجة تعبي نموذج المدة يدوياً
+async function quickTrialDay() {
+  let customerName = document.getElementById('customer-name').value.trim();
+  if (!customerName) customerName = 'تجربة - ' + new Date().toLocaleDateString('ar-EG');
+  try {
+    const data = await api('/api/admin/licenses', { method: 'POST', body: JSON.stringify({ customerName, days: 1 }) });
+    document.getElementById('new-key-result').innerHTML =
+      `✅ مفتاح تجربة (يوم واحد): <b style="color:#f39c12">${data.key}</b><br>ينتهي: ${new Date(data.expiresAt).toLocaleDateString('ar-EG')} ${new Date(data.expiresAt).toLocaleTimeString('ar-EG')}<br>انسخه وجربه بجهاز الزبون.`;
+    loadLicenses();
+  } catch (e) { alert('خطأ: ' + e.message); }
+}
+
+async function loadContactInfo() {
+  try {
+    const res = await fetch('/api/contact-info');
+    const info = await res.json();
+    document.getElementById('contact-whatsapp').value = info.whatsapp || '';
+    document.getElementById('contact-instagram').value = info.instagram || '';
+    document.getElementById('contact-website').value = info.website || '';
+  } catch (e) { /* ما مشكلة إذا فشل، تضل الحقول فاضية */ }
+}
+
+async function saveContactInfo() {
+  const whatsapp = document.getElementById('contact-whatsapp').value.trim();
+  const instagram = document.getElementById('contact-instagram').value.trim();
+  const website = document.getElementById('contact-website').value.trim();
+  const resultEl = document.getElementById('contact-save-result');
+  try {
+    await api('/api/admin/contact-info', { method: 'POST', body: JSON.stringify({ whatsapp, instagram, website }) });
+    resultEl.textContent = '✅ تم الحفظ - رح تنعكس بتطبيق الكاشير تلقائياً.';
+    resultEl.style.color = '#2ecc71';
+  } catch (e) {
+    resultEl.textContent = 'خطأ: ' + e.message;
+    resultEl.style.color = '#e74c3c';
+  }
 }
 
 async function loadLicenses() {
@@ -121,9 +245,6 @@ async function unbind(key) {
     alert('تم فك ربط الجهاز — أول جهاز يفتح البرنامج بهذا المفتاح رح يرتبط بيه من جديد.');
   } catch (e) { alert('خطأ: ' + e.message); }
 }
-
-loadLicenses();
 </script>
 </body>
 </html>
-
