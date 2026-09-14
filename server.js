@@ -40,6 +40,12 @@ db.exec(`
     last_verified_at INTEGER
   )
 `);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  )
+`);
 
 // Generates keys like KIMS-7F3K-9QRT-2XWM (easy to read/type over the phone).
 // Excludes visually confusing characters (0/O, 1/I).
@@ -91,6 +97,22 @@ app.post('/api/license/verify', (req, res) => {
 });
 
 // ------------------------------------------------------------------
+// PUBLIC: معلومات التواصل بتاعتك (واتساب/انستغرام/رابط إضافي) يقرأها التطبيق
+// نفسه ليعرضها للزبون - ما فيها شي حساس، فما تحتاج كلمة سر.
+// ------------------------------------------------------------------
+app.get('/api/contact-info', (req, res) => {
+  const rows = db.prepare('SELECT key, value FROM settings').all();
+  const info = { whatsapp: '', instagram: '', website: '' };
+  rows.forEach(r => { info[r.key] = r.value; });
+  res.json(info);
+});
+
+// يستخدمها زر "دخول" بصفحة الإدارة بس للتأكد إن كلمة السر صحيحة قبل ما يفتح الصفحة كاملة
+app.post('/api/admin/check', requireAdmin, (req, res) => {
+  res.json({ ok: true });
+});
+
+// ------------------------------------------------------------------
 // ADMIN (password-protected): used from the /admin page to manage keys.
 // ------------------------------------------------------------------
 app.post('/api/admin/licenses', requireAdmin, (req, res) => {
@@ -127,6 +149,19 @@ app.post('/api/admin/licenses/:key/revoke', requireAdmin, (req, res) => {
 
 app.post('/api/admin/licenses/:key/unbind', requireAdmin, (req, res) => {
   db.prepare('UPDATE licenses SET device_id = NULL WHERE key = ?').run(req.params.key);
+  res.json({ ok: true });
+});
+
+// حفظ/تحديث معلومات التواصل (واتساب/انستغرام/رابط إضافي) - يظهرون بعدها تلقائياً بتطبيق الكاشير
+app.post('/api/admin/contact-info', requireAdmin, (req, res) => {
+  const { whatsapp, instagram, website } = req.body || {};
+  const upsert = db.prepare(`
+    INSERT INTO settings (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `);
+  if (whatsapp !== undefined) upsert.run('whatsapp', String(whatsapp || ''));
+  if (instagram !== undefined) upsert.run('instagram', String(instagram || ''));
+  if (website !== undefined) upsert.run('website', String(website || ''));
   res.json({ ok: true });
 });
 
