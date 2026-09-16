@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.gamescafee2000.twa",
+        "sha256_cert_fingerprints": ["62:B4:D7:27:A3:54:99:DC:9C:87:AE:82:27:05:5B:25:7B:00:14:00:53:F6:AC:81:9D:39:D1:36:C8:BA:4D:F2"]
+      }
+    }]
